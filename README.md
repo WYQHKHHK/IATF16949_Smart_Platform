@@ -1,20 +1,35 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+  <h1 style="color: #b91c1c;">IATF 16949 智能工作台</h1>
+  <p>数字化时代的汽车行业质量标准学习与应用平台</p>
 </div>
 
-# Run and deploy your AI Studio app
+## 项目简介
 
-This contains everything you need to run your app locally.
+本项目旨在打破传统厚重纸质标准的局限，将 IATF 16949:2016 标准转化为结构化、场景化的数字知识库。
 
-View your app in AI Studio: https://ai.studio/apps/cd047442-2cc7-41a5-b85b-544c7aac1ba4
+**主要功能：**
+- **🔍 结构化速查**：毫秒级按编号/关键字搜索条款。
+- **🧠 场景化抽认卡**：打破死记硬背，采用间隔重复与翻转记忆。
+- **📝 在线模拟测验**：模拟内审场景，即时反馈进度与准确率。
+- **💡 智能落地指南**：内置条款白话解读，直击工厂实际应用与留存证据要求。
 
-## Run Locally
+## 本地运行
 
-**Prerequisites:**  Node.js
+本项目采用完全静态的 React + Vite 架构，零后端依赖，保障隐私安全。
 
+**前置要求：** Node.js 环境
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. 安装依赖：
+   ```bash
+   npm install
+   ```
+2. 启动开发服务器：
+   ```bash
+   npm run dev
+   ```
+
+## 发布与部署
+
+推荐使用 [Vercel](https://vercel.com/) 进行极速部署。直接将本仓库导入 Vercel 即可自动识别并发布。
+
+*版权免责声明：本平台为独立辅助工具。IATF 16949 官方标准文本版权归属 AIAG/IATF。平台内置的条款解读仅供学习参考，不作为正式内审/认证依据。*

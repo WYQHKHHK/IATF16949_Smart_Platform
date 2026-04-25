@@ -5,98 +5,63 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export default function GlossaryMode() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | 'core_tool' | 'process' | 'general'>('all');
 
   const filteredTerms = useMemo(() => {
     return glossaryData.filter((term) => {
       const matchesSearch = 
         term.term.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        (term.acronym && term.acronym.toLowerCase().includes(searchQuery.toLowerCase())) ||
         term.definition.toLowerCase().includes(searchQuery.toLowerCase());
       
-      const matchesFilter = filter === 'all' || term.category === filter;
-      
-      return matchesSearch && matchesFilter;
+      return matchesSearch;
     }).sort((a, b) => a.term.localeCompare(b.term));
-  }, [searchQuery, filter]);
+  }, [searchQuery]);
 
   return (
-    <div className="bg-white p-6 md:p-12 shadow-sm border border-black/5 relative w-full flex flex-col min-h-[600px] max-w-4xl mx-auto">
-      <div className="absolute -left-4 top-12 bg-red-700 text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest hidden md:block">
-        词汇表
+    <div className="bg-white dark:bg-stone-900 p-6 md:p-12 shadow-sm border border-black/5 dark:border-white/5 relative w-full flex flex-col min-h-[600px] max-w-4xl mx-auto transition-colors duration-500">
+      <div className="absolute -left-4 top-12 bg-red-700 dark:bg-red-800 text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest hidden md:block">
+        术语表
       </div>
       
       <header className="mb-12">
-        <span className="text-xs font-mono text-stone-400">专业术语</span>
-        <h3 className="text-4xl font-serif mt-2 leading-tight">核心术语</h3>
-        <p className="text-sm font-serif italic text-stone-500 mt-2">
-          理解 IATF 16949 至关重要的首字母缩写词和特定短语的定义。
+        <span className="text-xs font-mono text-stone-400 dark:text-stone-500">Section 3.1</span>
+        <h3 className="text-4xl font-serif mt-2 leading-tight text-stone-900 dark:text-stone-100">汽车行业术语</h3>
+        <p className="text-sm font-serif italic text-stone-500 dark:text-stone-400 mt-2">
+          IATF 16949:2016 规范定义的汽车行业核心术语与定义。
         </p>
       </header>
 
-      {/* Search and Filters */}
-      <div className="mb-8 space-y-4">
+      {/* Search */}
+      <div className="mb-8">
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-stone-500" />
           <input
             type="text"
-            placeholder="搜索术语、缩写或定义..."
+            placeholder="搜索术语、关键词或定义..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-stone-50 border border-black/10 focus:outline-none focus:border-red-700 focus:ring-1 focus:ring-red-700 font-serif transition-shadow"
+            className="w-full pl-12 pr-4 py-3 bg-stone-50 dark:bg-stone-800/50 border border-black/10 dark:border-white/10 text-stone-900 dark:text-stone-100 focus:outline-none focus:border-red-700 dark:focus:border-red-500 focus:ring-1 focus:ring-red-700 dark:focus:ring-red-500 font-serif transition-shadow"
           />
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {['all', 'core_tool', 'process', 'general'].map((f) => {
-            const labels: Record<string, string> = {
-              'all': '全部',
-              'core_tool': '核心工具',
-              'process': '过程',
-              'general': '通用'
-            };
-            return (
-             <button
-               key={f}
-               onClick={() => setFilter(f as any)}
-               className={`px-3 py-1 text-xs uppercase tracking-widest font-bold border transition-colors ${
-                 filter === f 
-                   ? 'bg-black text-white border-black' 
-                   : 'bg-white text-stone-500 border-stone-200 hover:border-black/30 hover:text-stone-800'
-               }`}
-             >
-               {labels[f]}
-             </button>
-            )
-          })}
         </div>
       </div>
 
-      {/* Glossary List */}
+      {/* Terminology List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <AnimatePresence>
-           {filteredTerms.map((item) => (
+           {filteredTerms.map((item, index) => (
              <motion.div
-               key={item.id}
+               key={`${item.term}-${index}`}
                initial={{ opacity: 0, scale: 0.95 }}
                animate={{ opacity: 1, scale: 1 }}
                exit={{ opacity: 0, scale: 0.95 }}
                transition={{ duration: 0.2 }}
                layout
-               className="p-6 border border-black/5 bg-stone-50 group hover:border-black/20 transition-colors"
+               className="p-6 border border-black/5 dark:border-white/5 bg-stone-50 dark:bg-stone-800/30 group hover:border-black/20 dark:hover:border-white/20 transition-colors"
              >
-               <div className="flex items-start justify-between mb-3">
-                 <h4 className="font-serif text-lg font-bold text-stone-900 group-hover:text-red-700 transition-colors">
-                   {item.term}
-                 </h4>
-                 {item.acronym && (
-                   <span className="ml-4 px-2 py-0.5 bg-white border border-stone-200 text-stone-600 text-xs font-mono font-bold shrink-0">
-                     {item.acronym}
-                   </span>
-                 )}
-               </div>
+               <h4 className="font-serif text-lg font-bold text-stone-900 dark:text-stone-100 group-hover:text-red-700 dark:group-hover:text-red-400 transition-colors mb-3">
+                 {item.term}
+               </h4>
                
-               <p className="text-sm font-serif text-stone-600 leading-relaxed">
+               <p className="text-sm font-serif text-stone-600 dark:text-stone-400 leading-relaxed whitespace-pre-line">
                  {item.definition}
                </p>
                

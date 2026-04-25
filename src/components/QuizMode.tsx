@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { flatIatfData, Clause } from '../data/iatfData';
+import { iatfData, Clause } from '../data/iatfData';
 import { motion, AnimatePresence } from 'motion/react';
 import { useProgress } from '../ProgressContext';
-import { GoogleGenAI } from '@google/genai';
 import { Loader2 } from 'lucide-react';
 
-// Initialize Gemini API outside component to reuse
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Flatten function to get all clauses including interpretations
+const flattenClauses = (clauses: Clause[]): Clause[] => {
+  let result: Clause[] = [];
+  clauses.forEach(clause => {
+    result.push(clause);
+    if (clause.subClauses && clause.subClauses.length > 0) {
+      result = result.concat(flattenClauses(clause.subClauses));
+    }
+  });
+  return result;
+};
+
+const allClauses = flattenClauses(iatfData);
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -39,42 +49,56 @@ export default function QuizMode() {
 
     if (selectedDifficulty === 'hard') {
       try {
-        const clausesToUse = [...flatIatfData].sort(() => 0.5 - Math.random()).slice(0, 5);
-        const clauseListStr = clausesToUse.map(c => `${c.id}: ${c.title}`).join('\n');
-        
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: `Generate a 10-question multiple choice quiz about IATF 16949.
-          Create practical automotive manufacturing scenarios and ask which clause applies.
-          Return ONLY a valid JSON array of objects with this structure:
-          [{ "scenario": "...", "options": ["4.1", "5.2", "8.5.1.1", "9.1.2.1"], "correctAns": "8.5.1.1" }]
-          Ensure the correctAns is exactly one of the options. Use Chinese for the scenario. Do NOT use markdown code blocks like \`\`\`json. Just return the raw JSON array.`,
-        });
-        
-        const text = response.text || '[]';
-        const cleanedText = text.replace(/```json\n?|\n?```/g, '').trim();
-        const generatedData = JSON.parse(cleanedText);
-        
-        if (Array.isArray(generatedData) && generatedData.length > 0) {
-          generatedData.forEach((q: any) => {
-             qs.push({
-               type: 'scenario',
-               scenario: q.scenario,
-               options: q.options,
-               correctAns: q.correctAns
-             });
-          });
-        } else {
-           throw new Error("Invalid format returned");
+        // Filter clauses that have valid cases
+        const clausesWithCases = allClauses.filter(c => 
+          c.interpretation && 
+          c.interpretation.cases && 
+          c.interpretation.cases.trim() !== '' &&
+          c.interpretation.cases.trim() !== '[请在此处输入应用案例，如果没有可留空]' &&
+          (c.interpretation.cases.includes('案例') || c.interpretation.cases.length > 20)
+        );
+
+        if (clausesWithCases.length < 5) {
+          throw new Error("Not enough clauses with cases found.");
         }
+
+        // Pick 10 random clauses with cases
+        const selectedClauses = [...clausesWithCases]
+          .sort(() => 0.5 - Math.random())
+          .slice(0, 10);
+
+        selectedClauses.forEach(clause => {
+          // Clean up the case text (remove "**案例**：" prefix if exists)
+          let scenario = clause.interpretation!.cases.replace(/^\*\*案例\*\*[:：]\s*/, '').trim();
+          
+          const options = new Set<string>();
+          const correctAns = clause.id;
+          options.add(correctAns);
+
+          // Add 3 distractors
+          while (options.size < 4) {
+            const randClause = allClauses[Math.floor(Math.random() * allClauses.length)];
+            if (randClause.id !== correctAns) {
+              options.add(randClause.id);
+            }
+          }
+
+          qs.push({
+            type: 'scenario',
+            scenario,
+            options: Array.from(options).sort(() => 0.5 - Math.random()),
+            correctAns
+          });
+        });
+
       } catch (err) {
         console.error(err);
-        setGenerateError("Failed to generate hard mode questions. Please try again or select another difficulty.");
+        setGenerateError("本地案例不足，无法生成困难模式题目。请先完善条款的“应用案例”。");
         setIsGenerating(false);
         return;
       }
     } else {
-      const shuffled = [...flatIatfData].sort(() => 0.5 - Math.random());
+      const shuffled = [...allClauses].sort(() => 0.5 - Math.random());
       const selected = shuffled.slice(0, qCount);
 
       selected.forEach(clause => {
@@ -85,7 +109,7 @@ export default function QuizMode() {
         options.add(correctAns);
 
         while (options.size < 4) {
-          const randClause = flatIatfData[Math.floor(Math.random() * flatIatfData.length)];
+          const randClause = allClauses[Math.floor(Math.random() * allClauses.length)];
           const wrongAns = isGuessTitle ? randClause.title : randClause.id;
           options.add(wrongAns);
         }
@@ -140,8 +164,8 @@ export default function QuizMode() {
 
   if (!difficulty || generateError) {
     return (
-      <div className="bg-white p-12 shadow-sm border border-black/5 flex flex-col items-center justify-center py-24 min-h-[500px]">
-        <h2 className="text-4xl font-serif font-light tracking-tight mb-8">选择难度</h2>
+      <div className="bg-white dark:bg-stone-900 p-12 shadow-sm border border-black/5 dark:border-white/5 flex flex-col items-center justify-center py-24 min-h-[500px] transition-colors">
+        <h2 className="text-4xl font-serif font-light tracking-tight mb-8 text-stone-900 dark:text-stone-100">选择难度</h2>
         
         {generateError && (
           <div className="mb-6 text-red-600 font-serif italic text-center max-w-md">
@@ -153,30 +177,30 @@ export default function QuizMode() {
           <button 
             onClick={() => generateQuestions('easy')}
             disabled={isGenerating}
-            className="p-8 border border-black/10 hover:border-black transition-colors text-left flex flex-col group disabled:opacity-50"
+            className="p-8 border border-black/10 dark:border-white/10 hover:border-black dark:hover:border-white transition-colors text-left flex flex-col group disabled:opacity-50"
           >
-            <span className="text-[10px] uppercase tracking-widest font-bold text-stone-400 group-hover:text-black transition-colors">简单</span>
-            <span className="font-serif text-2xl mt-4">识别编号</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-stone-400 group-hover:text-black dark:group-hover:text-white transition-colors">简单</span>
+            <span className="font-serif text-2xl mt-4 text-stone-900 dark:text-stone-100">识别编号</span>
             <span className="text-sm font-serif italic text-stone-500 mt-2">给出条款标题，识别正确的条款编号。</span>
           </button>
           
           <button 
              onClick={() => generateQuestions('medium')}
              disabled={isGenerating}
-             className="p-8 border border-black/10 hover:border-black transition-colors text-left flex flex-col group disabled:opacity-50"
+             className="p-8 border border-black/10 dark:border-white/10 hover:border-black dark:hover:border-white transition-colors text-left flex flex-col group disabled:opacity-50"
           >
-            <span className="text-[10px] uppercase tracking-widest font-bold text-stone-400 group-hover:text-black transition-colors">中等</span>
-            <span className="font-serif text-2xl mt-4">识别标题</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-stone-400 group-hover:text-black dark:group-hover:text-white transition-colors">中等</span>
+            <span className="font-serif text-2xl mt-4 text-stone-900 dark:text-stone-100">识别标题</span>
             <span className="text-sm font-serif italic text-stone-500 mt-2">给出条款编号，识别正确的条款标题。</span>
           </button>
           
           <button 
              onClick={() => generateQuestions('hard')}
              disabled={isGenerating}
-             className="p-8 border border-black/10 hover:border-black transition-colors text-left flex flex-col group disabled:opacity-50"
+             className="p-8 border border-black/10 dark:border-white/10 hover:border-black dark:hover:border-white transition-colors text-left flex flex-col group disabled:opacity-50"
           >
-            <span className="text-[10px] uppercase tracking-widest font-bold text-red-700 group-hover:text-red-900 transition-colors">困难</span>
-            <span className="font-serif text-2xl mt-4">情景题</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-red-700 dark:text-red-500 group-hover:text-red-900 dark:group-hover:text-red-400 transition-colors">困难</span>
+            <span className="font-serif text-2xl mt-4 text-stone-900 dark:text-stone-100">情景题</span>
             <span className="text-sm font-serif italic text-stone-500 mt-2">阅读实际应用场景，并通过 AI 识别适用的条款。</span>
             {isGenerating && (
               <span className="mt-4 flex items-center text-xs text-stone-500 uppercase tracking-widest font-bold">
@@ -193,34 +217,34 @@ export default function QuizMode() {
     const overallAccuracy = quizStats.total > 0 ? Math.round((quizStats.correct / quizStats.total) * 100) : 0;
     
     return (
-      <div className="bg-white p-12 shadow-sm border border-black/5 flex flex-col items-center justify-center py-24 min-h-[500px]">
-        <span className="text-[10px] uppercase font-bold tracking-widest text-stone-400 mb-4">最终得分</span>
-        <h2 className="text-8xl font-serif font-light tracking-tight mb-2">{score}<span className="text-4xl text-stone-300">/{questions.length}</span></h2>
+      <div className="bg-white dark:bg-stone-900 p-12 shadow-sm border border-black/5 dark:border-white/5 flex flex-col items-center justify-center py-24 min-h-[500px] transition-colors duration-500">
+        <span className="text-[10px] uppercase font-bold tracking-widest text-stone-400 dark:text-stone-500 mb-4">测验完成</span>
+        <h2 className="text-8xl font-serif font-light tracking-tight mb-2 text-stone-900 dark:text-stone-100">{score}<span className="text-4xl text-stone-300 dark:text-stone-700">/{questions.length}</span></h2>
         
         <div className="flex gap-6 mt-4 opacity-60">
           <div className="flex flex-col items-center">
-            <span className="text-[10px] uppercase tracking-widest font-bold">总测验次数</span>
-            <span className="font-serif text-xl">{quizStats.attempts}</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-stone-400">总测验次数</span>
+            <span className="font-serif text-xl text-stone-800 dark:text-stone-200">{quizStats.attempts}</span>
           </div>
           <div className="flex flex-col items-center">
-            <span className="text-[10px] uppercase tracking-widest font-bold">平均正确率</span>
-            <span className="font-serif text-xl">{overallAccuracy}%</span>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-stone-400">平均正确率</span>
+            <span className="font-serif text-xl text-stone-800 dark:text-stone-200">{overallAccuracy}%</span>
           </div>
         </div>
 
-        <p className="text-stone-600 font-serif text-lg mb-10 max-w-md text-center mt-6">
+        <p className="text-stone-600 dark:text-stone-400 font-serif text-lg mb-10 max-w-md text-center mt-6">
           {score >= 8 ? "表现非常出色，您对该标准的理解非常透彻！" : "干得不错。建议进一步复习以达到完全掌握程度。"}
         </p>
         <div className="flex gap-4">
           <button
             onClick={() => generateQuestions(difficulty)}
-            className="px-8 py-3 bg-black text-white text-[10px] uppercase font-bold tracking-widest hover:bg-stone-800 transition-colors"
+            className="px-8 py-3 bg-black dark:bg-stone-800 text-white text-[10px] uppercase font-bold tracking-widest hover:bg-stone-800 dark:hover:bg-stone-700 transition-colors"
           >
             重做 ({difficulty})
           </button>
           <button
             onClick={resetQuiz}
-            className="px-8 py-3 border border-black text-[10px] uppercase font-bold tracking-widest hover:bg-stone-100 transition-colors"
+            className="px-8 py-3 border border-black dark:border-white/20 text-black dark:text-white text-[10px] uppercase font-bold tracking-widest hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
           >
             更改难度
           </button>
@@ -233,11 +257,11 @@ export default function QuizMode() {
   const correctAns = currentQ.correctAns;
 
   return (
-    <div className="max-w-4xl mx-auto bg-white shadow-sm border border-black/5 flex flex-col w-full min-h-[500px]">
-      <div className="px-6 md:px-12 py-8 border-b border-black/5 flex justify-between items-center bg-stone-50">
+    <div className="max-w-4xl mx-auto bg-white dark:bg-stone-900 shadow-sm border border-black/5 dark:border-white/5 flex flex-col w-full min-h-[500px] transition-colors duration-500">
+      <div className="px-6 md:px-12 py-8 border-b border-black/5 dark:border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center bg-stone-50 dark:bg-stone-800/50 gap-4 transition-colors duration-500">
         <div>
           <span className="text-[10px] uppercase font-bold tracking-widest text-stone-400">进度</span>
-          <p className="text-2xl font-serif mt-1 text-black">{currentIndex + 1} <span className="text-sm text-stone-400">/ {questions.length}</span></p>
+          <p className="text-2xl font-serif mt-1 text-black dark:text-white">{currentIndex + 1} <span className="text-sm text-stone-400 dark:text-stone-600">/ {questions.length}</span></p>
         </div>
         <div className="flex items-center gap-6">
            <div className="text-right hidden sm:block">
@@ -248,7 +272,7 @@ export default function QuizMode() {
           </div>
           <div className="text-right">
             <span className="text-[10px] uppercase font-bold tracking-widest text-stone-400">得分</span>
-            <p className="text-2xl font-serif mt-1 text-black">{score}</p>
+            <p className="text-2xl font-serif mt-1 text-black dark:text-white">{score}</p>
           </div>
         </div>
       </div>
@@ -257,24 +281,24 @@ export default function QuizMode() {
         <div className="mb-12">
           {currentQ.type === 'guess_title' ? (
             <>
-              <span className="text-[10px] uppercase font-bold tracking-widest text-red-700">识别标题</span>
-              <h2 className="text-4xl font-serif mt-4 leading-tight">
+              <span className="text-[10px] uppercase font-bold tracking-widest text-red-700 dark:text-red-500">识别标题</span>
+              <h2 className="text-4xl font-serif mt-4 leading-tight text-stone-900 dark:text-stone-100">
                 以下编号对应的条款标题是？ <br />
                 <span className="font-sans font-bold tracking-tighter text-6xl mt-2 block">{currentQ.clause?.id}</span>
               </h2>
             </>
           ) : currentQ.type === 'guess_id' ? (
             <>
-              <span className="text-[10px] uppercase font-bold tracking-widest text-red-700">识别编号</span>
-              <h2 className="text-3xl lg:text-4xl font-serif mt-4 leading-tight">
+              <span className="text-[10px] uppercase font-bold tracking-widest text-red-700 dark:text-red-500">识别编号</span>
+              <h2 className="text-3xl lg:text-4xl font-serif mt-4 leading-tight text-stone-900 dark:text-stone-100">
                 以下标题对应的条款编号是？<br />
-                <span className="italic mt-4 block text-stone-700">"{currentQ.clause?.title}"</span>
+                <span className="italic mt-4 block text-stone-700 dark:text-stone-400">"{currentQ.clause?.title}"</span>
               </h2>
             </>
           ) : (
              <>
-              <span className="text-[10px] uppercase font-bold tracking-widest text-red-700">场景分析</span>
-              <h2 className="text-2xl font-serif mt-4 leading-relaxed text-stone-800">
+              <span className="text-[10px] uppercase font-bold tracking-widest text-red-700 dark:text-red-500">场景分析</span>
+              <h2 className="text-2xl font-serif mt-4 leading-relaxed text-stone-800 dark:text-stone-200">
                 {currentQ.scenario}
               </h2>
             </>
@@ -283,14 +307,14 @@ export default function QuizMode() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {currentQ.options.map((option, idx) => {
-            let stateClass = "bg-white border-black/10 hover:border-black text-black";
+            let stateClass = "bg-white dark:bg-stone-800 border-black/10 dark:border-white/10 hover:border-black dark:hover:border-white text-black dark:text-white";
             if (selectedOption !== null) {
               if (option === correctAns) {
-                stateClass = "bg-stone-100 border-black font-bold text-black";
+                stateClass = "bg-stone-100 dark:bg-stone-700 border-black dark:border-white font-bold text-black dark:text-white";
               } else if (option === selectedOption) {
-                stateClass = "bg-white border-red-700 text-red-700";
+                stateClass = "bg-white dark:bg-stone-900 border-red-700 dark:border-red-500 text-red-700 dark:text-red-500";
               } else {
-                stateClass = "bg-white border-black/5 text-stone-300";
+                stateClass = "bg-white dark:bg-stone-950 border-black/5 dark:border-white/5 text-stone-300 dark:text-stone-700";
               }
             }
 
@@ -329,18 +353,18 @@ export default function QuizMode() {
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-12 flex justify-end pt-8 border-t border-black/5 items-center gap-6"
+              className="mt-12 flex justify-end pt-8 border-t border-black/5 dark:border-white/5 items-center gap-6"
             >
               <button
                 onClick={resetQuiz}
-                className="text-stone-400 hover:text-black text-[10px] uppercase font-bold tracking-widest transition-colors"
+                className="text-stone-400 dark:text-stone-600 hover:text-black dark:hover:text-white text-[10px] uppercase font-bold tracking-widest transition-colors"
                 style={{marginRight: 'auto'}}
               >
                 结束测试
               </button>
               <button
                 onClick={handleNext}
-                className="px-8 py-3 bg-black text-white text-[10px] uppercase font-bold tracking-widest hover:bg-stone-800 transition-colors"
+                className="px-8 py-3 bg-black dark:bg-stone-800 text-white text-[10px] uppercase font-bold tracking-widest hover:bg-stone-800 dark:hover:bg-stone-700 transition-colors"
               >
                 {currentIndex < questions.length - 1 ? '下一题' : '查看结果'}
               </button>

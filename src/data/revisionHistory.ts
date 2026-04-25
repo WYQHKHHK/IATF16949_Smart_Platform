@@ -83,5 +83,26 @@ export const historyData: RevisionEvent[] = [
     description: '近期关于强化校准要求、外部实验室使用规则，以及控制计划与 FMEA 及过程流程图一致性的更新。',
     type: 'si',
     relatedClauses: ['7.1.5.2.1', '7.1.5.3.2', '8.5.1.1']
+  },
+  {
+    id: 'iatf-rules-6th-2024',
+    date: '2024年4月',
+    title: 'IATF 认证规则 (Rules) 第 6 版发布',
+    description: '取代第 5 版规则，于 2025 年 1 月 1 日正式生效。优化了审核策划、远程支持场所（RSL）管理以及证书周期的要求。',
+    type: 'major_release'
+  },
+  {
+    id: 'si-rules-1-17-2024',
+    date: '2024年11月',
+    title: '规则第 6 版认可解释 (SIs 1-17)',
+    description: '针对第 6 版规则的首批修正，明确了见证审核数量、制造现场审核周期图表以及审核策划的详细要求。',
+    type: 'si'
+  },
+  {
+    id: 'si-rules-19-21-2025',
+    date: '2025年11月',
+    title: '规则第 6 版最新认可解释 (SIs 19-21)',
+    description: '最新的修订内容：明确了认证机构法人实体持股要求（SI 19）、细化了合并审核计划的限制（SI 20），并澄清了内部体系审核记录的提交要求（SI 21）。',
+    type: 'si'
   }
 ];

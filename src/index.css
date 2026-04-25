@@ -1,25 +1,29 @@
 @import url('https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.1.0/style.css');
 @import "tailwindcss";
 
+/* 启用基于 .dark 类的暗黑模式变体 (Tailwind v4 方式) */
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "LXGW WenKai", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "LXGW WenKai", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
 }
 
-html.dark {
-  filter: invert(1) hue-rotate(180deg);
+:root {
+  --app-bg: #f9f8f6; /* stone-50 */
+  --app-text: #1c1917; /* stone-900 */
+  --app-border: rgba(0, 0, 0, 0.05);
 }
 
-html.dark img,
-html.dark video,
-html.dark iframe {
-  filter: invert(1) hue-rotate(180deg);
+.dark {
+  --app-bg: #0c0a09; /* stone-950 */
+  --app-text: #f5f5f4; /* stone-100 */
+  --app-border: rgba(255, 255, 255, 0.05);
 }
 
-html {
-  transition: filter 0.5s ease;
-}
-
-body {
+html, body {
+  background-color: var(--app-bg);
+  color: var(--app-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
   font-family: "LXGW WenKai", sans-serif;
 }
